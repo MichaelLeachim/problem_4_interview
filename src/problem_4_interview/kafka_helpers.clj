@@ -1,9 +1,22 @@
+;; @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+;; @ Copyright (c) Michael Leahcim                                                      @
+;; @ You can find additional information regarding licensing of this work in LICENSE.md @
+;; @ You must not remove this notice, or any other, from this software.                 @
+;; @ All rights reserved.                                                               @
+;; @@@@@@ At 2019-05-11 22:07 <thereisnodotcollective@gmail.com> @@@@@@@@@@@@@@@@@@@@@@@@
+
 (ns problem_4_interview.kafka-helpers
   (:require [clojure.java.io :as io]
             [clojure.tools.logging :as log]
             [me.raynes.fs :as fs])
   (:import [org.apache.curator.test TestingServer]
            [kafka.server KafkaConfig KafkaServerStartable]))
+
+;; TODO: figure out how to start up
+;;       send several messages
+;;       receive those messages
+;;       use streams API to make a words filter: consume from the topic <main>, post to topic filter_
+
 
 (defn start-zookeeper [port]
   (fs/delete-dir "/tmp/zk")
@@ -21,3 +34,12 @@
     (.startup kafka)
     (log/info "kafka started")
     kafka))
+
+(comment
+  (start-zookeeper 2222)
+  (def kafka  (start-kafka-server "127.0.0.1:2222"))
+  (.stop kafka)
+  
+  
+ )
+

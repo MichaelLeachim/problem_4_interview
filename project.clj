@@ -3,6 +3,9 @@
    :dependencies [[org.clojure/clojure "1.10.0"]
                   
                   [metosin/compojure-api "1.1.11"]
+
+                  [fundingcircle/jackdaw "0.6.4"]
+
                   
                   [org.clojure/tools.logging        "0.4.0"]
                   [ch.qos.logback/logback-classic   "1.2.3"]
