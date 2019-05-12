@@ -30,7 +30,7 @@
    "enable.auto.commit" "false"})
 
 (def application-config
-  {"application.id"            "word-count"
+  {"application.id"            "problem-4-interview"
    "bootstrap.servers"         bootstrap-servers
    "default.key.serde"         "jackdaw.serdes.EdnSerde"
    "default.value.serde"       "jackdaw.serdes.EdnSerde"
@@ -57,6 +57,18 @@
     :key-serde key-serde
     :value-serde value-serde}))
 
+;; ====================== Misc ============================================
+
+(defn- build-filter-fn
+  [builder from-topic to-topic filter-fn]
+  (let [input-stream   (j/kstream builder from-topic)
+        filter-fn
+        (j/filter input-stream
+                  (fn [[k v]]
+                    (filter-fn k v)))
+        _ (j/to filter-fn to-topic)]
+    builder))
+
 ;; ======================= Mutable actions ===============================
 
 (defn create-topic!
@@ -73,9 +85,9 @@
       (ja/create-topics! client [topic-config]))))
 
 (defn delete-topic!
-  [topic-name]
+  [topic]
   (with-open [client (ja/->AdminClient (kafka-admin-client-config))]
-    (ja/delete-topics! client [{:topic-name topic-name}])))
+    (ja/delete-topics! client [topic])))
 
 (defn publish!
   "Takes a topic config and record value, and (optionally) a key and
@@ -86,6 +98,16 @@
    (with-open [client (jc/producer (kafka-producer-config) topic-config)]
      @(jc/produce! client topic-config key value))
    nil))
+
+(defn create-filter-stream!
+  [from-topic to-topic filter-fn]
+  (let [builder (j/streams-builder)
+        _ (create-topic-if-not-exists! to-topic)
+        _ (build-filter-fn builder from-topic to-topic filter-fn)
+        app (j/kafka-streams builder application-config)
+        _ (j/start app)]
+    app))
+
 
 ;; ======================= Immutable helpers ==============================
 
@@ -114,73 +136,50 @@
       https://stackoverflow.com/questions/28561147/how-to-read-data-using-kafka-consumer-api-from-beginning"
   
   ([topic-config]
-   (get-records topic-config 200))
+   (list-records-from-the-beginning topic-config 200))
   ([topic-config polling-interval-ms]
-   (get-records
+   (list-records-from-the-beginning
     topic-config polling-interval-ms
     (str (java.util.UUID/randomUUID))))
   ([topic-config polling-interval-ms consumer-id ]
    (let [client-config (kafka-consumer-config consumer-id)]
      (with-open [client (jc/subscribed-consumer client-config
                                                 [topic-config])]
-       (doall (jcl/log client 100 seq))))))
+       (let [result  (doall (jcl/log client 100 seq))
+             _ (.close client)]
+         result)))))
 
-(defn topology-builder
-  "Takes a topic metadata function and returns a function that builds
-  the topology."
-  [topic-metadata]
-  (fn [builder]
-    (let [text-input (-> (j/kstream builder (:input topic-metadata))
-                         (j/peek (fn [[k v]] (info (str {:key k :value v})))))
 
-          counts (-> text-input
-                     (j/flat-map-values split-lines)
-                     (j/group-by (fn [[_ v]] v))
-                     (j/count))]
-
-      (-> counts
-          (j/to-kstream)
-          (j/to (:output topic-metadata)))
-      builder)))
-
-(defn filter-to
-  [builder from-topic to-topic filter-fn]
-  (let [input-stream   (j/kstream builder from-topic)
-        filter-fn
-        (j/filter input-stream
-                  (fn [[key val]]
-                    (filter-fn key val)))
-        _ (j/to filter-fn to-topic)]
-    builder))
-(def builder (j/streams-builder))
-(def filter-fn
-  (filter-to builder
-             (make-topic-config "input1")
-             (make-topic-config "blabus")
-             (fn [key val]
-               (= val "b"))))
-
-(def  app (j/kafka-streams builder application-config))
-
-(defn start-app
-  "Starts the stream processing application."
-  []
-  (let [builder 
-        _ 
-        ]
-    (j/start app)
-    app))
+(defn list-topic-vals
+  [topic]
+  (map :value (list-records-from-the-beginning topic)))
 
 (comment
-  (list-topics )
-  (delete-topic! "test2")
-  (create-topic! (make-topic-config "blabus"))
-  (publish! (make-topic-config "bbb")  "blib")
-  (map :value (get-records (make-topic-config "bbb")))
-  (def app (start-app))
   
-  (map :value (get-records (make-topic-config "input")))
-  (map :value (get-records (make-topic-config "blabus")))
+  (list-topics )
+  
+  (delete-topic! (make-topic-config "java"))
+  (create-topic! (make-topic-config "input"))
+  
+  (publish! (make-topic-config "input")  "java")
+  
+  (map :value (get-records (make-topic-config "bbb")))
+  (def java-filter
+    (create-filter-stream!
+     (make-topic-config "input")
+     (make-topic-config "java")
+     (fn [key val]
+       (clojure.string/includes? (clojure.string/lower-case val) "java"))))
+  (j/close java-filter)
+  
+  (list-topic-vals (make-topic-config "java"))
+  (list-topic-vals (make-topic-config "input"))
+  (publish! (make-topic-config "input") "java333")
+  (delete-topic! (make-topic-config "java"))
+  (j/close java-filter)
+  
+  (map :value (list-records-from-the-beginning (make-topic-config "input")))
+  
   
   )
 

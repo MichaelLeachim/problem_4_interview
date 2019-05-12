@@ -37,7 +37,7 @@
 
 (comment
   (def zookeeper  (start-zookeeper 2181))
-  (def kafka  (start-kafka-server "localhost:2181"))
+  (def kafka  (start-kafka-server "127.0.0.1:2181"))
   (.stop kafka)
   
   
