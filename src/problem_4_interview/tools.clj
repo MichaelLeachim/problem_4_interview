@@ -85,10 +85,13 @@
   seq of maps."
   ([topic-config]
    (get-records topic-config 200))
-  
   ([topic-config polling-interval-ms]
-   (let [client-config (kafka-consumer-config
-                        (str (java.util.UUID/randomUUID)))]
+   (get-records
+    topic-config polling-interval-ms
+    (str (java.util.UUID/randomUUID))))
+  ([topic-config polling-interval-ms consumer-id ]
+   (let [client-config (kafka-consumer-config consumer-id)]
      (with-open [client (jc/subscribed-consumer client-config
                                                 [topic-config])]
        (doall (jcl/log client 100 seq))))))
+
