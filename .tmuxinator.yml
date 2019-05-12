@@ -1,0 +1,13 @@
+name: problem_4_interview
+windows:
+  - repl:
+      - lein repl
+  - test:
+      - lein test-refresh 
+  - zookeeper:
+    - cd vendor/kafka_2.12-2.2.0
+    - bin/zookeeper-server-start.sh config/zookeeper.properties
+  - kafka_server:
+    - rm -r /tmp/kafka-logs
+    - cd vendor/kafka_2.12-2.2.0
+    - bin/kafka-server-start.sh config/server.properties

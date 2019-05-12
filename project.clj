@@ -5,7 +5,6 @@
                   [metosin/compojure-api "1.1.11"]
 
                   [fundingcircle/jackdaw "0.6.4"]
-
                   
                   [org.clojure/tools.logging        "0.4.0"]
                   [ch.qos.logback/logback-classic   "1.2.3"]
@@ -20,4 +19,5 @@
    :profiles {:dev {:dependencies [[javax.servlet/javax.servlet-api "3.1.0"]
                                   [cheshire "5.5.0"]
                                   [ring/ring-mock "0.3.0"]]
-                   :plugins [[lein-ring "0.12.0"]]}})
+                    :plugins [[lein-ring "0.12.0"]
+                              [com.jakemccrary/lein-test-refresh "0.24.1"]]}})

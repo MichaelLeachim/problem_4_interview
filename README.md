@@ -6,6 +6,19 @@ FIXME
 
 ### Run the application locally
 
+```bash
+
+git clone <clone here>
+cd <path here>
+tmuxinator . 
+
+# run kafka
+
+cd vendor/kafka;
+bin/zookeeper-server-start.sh config/zookeeper.properties; 
+bin/kafka-server-start.sh config/server.properties;
+```
+
 `lein ring server`
 
 ### Run the tests

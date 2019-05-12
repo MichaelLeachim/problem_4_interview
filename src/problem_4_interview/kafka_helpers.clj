@@ -15,8 +15,8 @@
 ;; TODO: figure out how to start up
 ;;       send several messages
 ;;       receive those messages
-;;       use streams API to make a words filter: consume from the topic <main>, post to topic filter_
-
+;;       use streams API to make a words filter: consume from the topic <main>, post to topic filter
+;;       use admin API to create and delete topics
 
 (defn start-zookeeper [port]
   (fs/delete-dir "/tmp/zk")
@@ -25,7 +25,7 @@
     zk))
 
 (defn start-kafka-server [zk-address]
-  (let [config (KafkaConfig. {"zookeeper.connect"                zk-address
+  (let [config (KafkaConfig. {"zookeeper.connect"                 zk-address
                               "listeners"                        "PLAINTEXT://127.0.0.1:9092"
                               "auto.create.topics.enable"        true
                               "offsets.topic.replication.factor" (short 1)
@@ -36,8 +36,8 @@
     kafka))
 
 (comment
-  (start-zookeeper 2222)
-  (def kafka  (start-kafka-server "127.0.0.1:2222"))
+  (def zookeeper  (start-zookeeper 2181))
+  (def kafka  (start-kafka-server "localhost:2181"))
   (.stop kafka)
   
   
