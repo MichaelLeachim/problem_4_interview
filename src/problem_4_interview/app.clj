@@ -9,44 +9,6 @@
    [jackdaw.streams :as j]
    [jackdaw.admin :as ja]))
 
-(defn get-env [k default]
-  (get (System/getenv) k default))
-
-(def bootstrap-servers (get-env "BOOTSTRAP_SERVERS" "localhost:9092"))
-
-(def ^{:const true
-       :doc "A topic metadata map.
-  Provides all the information needed to create the topics used by the
-  application. It also describes the serdes used to read and write to
-  the topics."}
-
-  +topic-metadata+
-
-  {:input
-   {:topic-name "input"
-    :partition-count 1
-    :replication-factor 1
-    :key-serde {:serde-keyword :jackdaw.serdes.edn/serde}
-    :value-serde {:serde-keyword :jackdaw.serdes.edn/serde}}
-
-   :output
-   {:topic-name "output"
-    :partition-count 1
-    :replication-factor 1
-    :key-serde {:serde-keyword :jackdaw.serdes.edn/serde}
-    :value-serde {:serde-keyword :jackdaw.serdes.edn/serde}}})
-
-(def resolve-serde
-  (resolver/serde-resolver))
-
-(def topic-metadata
-  (reduce-kv (fn [m k v]
-               (assoc m k
-                      (assoc v
-                             :key-serde (resolve-serde (:key-serde v))
-                             :value-serde (resolve-serde (:value-serde v)))))
-             {}
-             +topic-metadata+))
 
 (def app-config
   "Returns the application config."
@@ -91,21 +53,14 @@
     (info "word-count is up")
     app))
 
-(defn stop-app
-  "Stops the stream processing application."
-  [app]
-  (j/close app)
-  (info "word-count is down"))
-
-
 (defn get-env [k default]
   (get (System/getenv) k default))
 
-(defn kafka-producer-config
+(defn- kafka-producer-config
   []
   {"bootstrap.servers" bootstrap-servers})
 
-(defn kafka-consumer-config
+(defn- kafka-consumer-config
   [group-id]
   {"bootstrap.servers" bootstrap-servers
    "group.id" group-id
