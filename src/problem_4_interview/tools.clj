@@ -137,9 +137,8 @@
       builder)))
 
 (defn filter-to
-  [from-topic to-topic filter-fn]
-  (let [builder        (j/streams-builder)
-        input-stream   (j/kstream builder from-topic)
+  [builder from-topic to-topic filter-fn]
+  (let [input-stream   (j/kstream builder from-topic)
         filter-fn
         (j/filter input-stream
                   (fn [[key val]]
@@ -147,16 +146,18 @@
         _ (j/to filter-fn to-topic)]
     builder))
 
-
 (defn start-app
   "Starts the stream processing application."
   [topic-metadata app-config]
   (let [builder (j/streams-builder)
-        topology ((topology-builder topic-metadata) builder)
-        app (j/kafka-streams topology app-config)]
+        _ (filter-to builder
+                     (make-topic-config "input")
+                     (make-topic-config "blabus")
+                     (fn [key val]
+                       (= val "b")))
+        app (j/kafka-streams builder app-config)]
     (j/start app)
-    (info "word-count is up")
-    app))
+    [app builder]))
 
 (comment
   (list-topics )
