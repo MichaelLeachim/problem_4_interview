@@ -29,6 +29,13 @@
    "auto.offset.reset" "earliest"
    "enable.auto.commit" "false"})
 
+(def application-config
+  {"application.id"            "word-count"
+   "bootstrap.servers"         bootstrap-servers
+   "default.key.serde"         "jackdaw.serdes.EdnSerde"
+   "default.value.serde"       "jackdaw.serdes.EdnSerde"
+   "cache.max.bytes.buffering" "0"})
+
 (defn make-topic-config
   "Takes a topic name and (optionally) key and value serdes and a
   partition count, and returns a topic configuration map, which may be
@@ -145,19 +152,24 @@
                     (filter-fn key val)))
         _ (j/to filter-fn to-topic)]
     builder))
+(def builder (j/streams-builder))
+(def filter-fn
+  (filter-to builder
+             (make-topic-config "input1")
+             (make-topic-config "blabus")
+             (fn [key val]
+               (= val "b"))))
+
+(def  app (j/kafka-streams builder application-config))
 
 (defn start-app
   "Starts the stream processing application."
-  [topic-metadata app-config]
-  (let [builder (j/streams-builder)
-        _ (filter-to builder
-                     (make-topic-config "input")
-                     (make-topic-config "blabus")
-                     (fn [key val]
-                       (= val "b")))
-        app (j/kafka-streams builder app-config)]
+  []
+  (let [builder 
+        _ 
+        ]
     (j/start app)
-    [app builder]))
+    app))
 
 (comment
   (list-topics )
@@ -165,6 +177,7 @@
   (create-topic! (make-topic-config "blabus"))
   (publish! (make-topic-config "bbb")  "blib")
   (map :value (get-records (make-topic-config "bbb")))
+  (def app (start-app))
   
   (map :value (get-records (make-topic-config "input")))
   (map :value (get-records (make-topic-config "blabus")))
