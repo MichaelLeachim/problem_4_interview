@@ -103,11 +103,11 @@
 
 (defn kafka-producer-config
   []
-  {"bootstrap.servers" "localhost:9092"})
+  {"bootstrap.servers" bootstrap-servers})
 
 (defn kafka-consumer-config
   [group-id]
-  {"bootstrap.servers" "localhost:9092"
+  {"bootstrap.servers" bootstrap-servers
    "group.id" group-id
    "auto.offset.reset" "earliest"
    "enable.auto.commit" "false"})
