@@ -1,3 +1,12 @@
+;; @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+;; @ Copyright (c) Michael Leahcim                                                      @
+;; @ You can find additional information regarding licensing of this work in LICENSE.md @
+;; @ You must not remove this notice, or any other, from this software.                 @
+;; @ All rights reserved.                                                               @
+;; @@@@@@ At 2019-05-13 20:54 <thereisnodotcollective@gmail.com> @@@@@@@@@@@@@@@@@@@@@@@@
+
+;; https://github.com/FundingCircle/jackdaw/tree/master/examples/dev
+
 (ns problem_4_interview.tools
   (:require
    [clojure.string :as str]
@@ -14,6 +23,7 @@
 
 (def bootstrap-servers
   (get (System/getenv) "BOOTSTRAP_SERVERS" "localhost:9092"))
+
 (defn kafka-producer-config
   []
   {"bootstrap.servers" bootstrap-servers})
@@ -27,7 +37,7 @@
   {"bootstrap.servers" bootstrap-servers
    "group.id" group-id
    "auto.offset.reset" "earliest"
-   "enable.auto.commit" "false"})
+   "enable.auto.commit" "true"})
 
 (def application-config
   {"application.id"            "problem-4-interview"
@@ -61,7 +71,7 @@
 
 (defn- build-filter-fn
   [builder from-topic to-topic filter-fn]
-  (let [input-stream   (j/kstream builder from-topic)
+  (let [input-stream  (j/kstream builder from-topic)
         filter-fn
         (j/filter input-stream
                   (fn [[k v]]
@@ -108,7 +118,6 @@
         _ (j/start app)]
     app))
 
-
 ;; ======================= Immutable helpers ==============================
 
 (defn topic-exists?
@@ -123,7 +132,7 @@
   (with-open [client (ja/->AdminClient (kafka-admin-client-config))]
     (ja/list-topics client)))
 
-(defn list-records-from-the-beginning
+(defn list-records
   "Takes a topic config, consumes from a Kafka topic, and returns a
   seq of maps.
   mik: 
@@ -136,27 +145,43 @@
       https://stackoverflow.com/questions/28561147/how-to-read-data-using-kafka-consumer-api-from-beginning"
   
   ([topic-config]
-   (list-records-from-the-beginning topic-config 200))
+   (list-records topic-config 200))
   ([topic-config polling-interval-ms]
-   (list-records-from-the-beginning
+   (list-records
     topic-config polling-interval-ms
     (str (java.util.UUID/randomUUID))))
-  ([topic-config polling-interval-ms consumer-id ]
+  ([topic-config polling-interval-ms consumer-id]
    (let [client-config (kafka-consumer-config consumer-id)]
      (with-open [client (jc/subscribed-consumer client-config
                                                 [topic-config])]
-       (let [result  (doall (jcl/log client 100 seq))
-             _ (.close client)]
-         result)))))
+       (doall (jcl/log client 100 seq))))))
 
+(defn subscribe
+  ([topic-config consume-fn]
+   (subscribe
+    topic-config
+    (str (java.util.UUID/randomUUID))
+    consume-fn))
+  ([topic-config consumer-id consume-fn]
+   (let [client-config (kafka-consumer-config consumer-id)
+         client (jc/subscribed-consumer client-config
+                                        [topic-config])]
+     (repeatedly
+      (fn []
+        (doseq [item (jc/poll client 200)]
+          (consume-fn client (:key item) (:value item))))))))
 
 (defn list-topic-vals
   [topic]
-  (map :value (list-records-from-the-beginning topic)))
+  (map :value (list-records topic)))
 
 (comment
   
-  (list-topics )
+  (def x
+    (subscribe
+     (make-topic-config "input")
+     println))
+
   
   (delete-topic! (make-topic-config "java"))
   (create-topic! (make-topic-config "input"))
@@ -178,7 +203,7 @@
   (delete-topic! (make-topic-config "java"))
   (j/close java-filter)
   
-  (map :value (list-records-from-the-beginning (make-topic-config "input")))
+  (map :value (list-records (make-topic-config "input") 200 ))
   
   
   )

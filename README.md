@@ -1,18 +1,32 @@
 # problem_4_interview
 
-FIXME
+Problem definition:
 
+https://hackmd.io/s/rJdSetNhM
+
+## How it should work?
+
+* Have an atom that maintains an app state
+  `{:id 1 :name "blab" :q "hello" :timestamp 123131231}`
+* Store that atom on a specific topic
+  (It is a hack, but it is easy to implement the same 
+   strategy but on another storage)
+* Subscribe to the `:input` channel
+* For every message, publish it to a channel, according to the 
+  filters. 
+* For new channel, create topic, add metadata, 
+  store results in app state atom
+* When starting up, read up an app state from the atom
+
+### Potential problems:
+
+* Reading from the beginning by creating a new consumer
+  will pile up unuzed data in Zookeeper:
+  Use `seekToBeginning` instead
+  See: https://stackoverflow.com/questions/28561147/how-to-read-data-using-kafka-consumer-api-from-beginning
+  
 ### TODO
-
-* move all config values to a separate config file
-* figure out how to extract timestamp in filter
-* figure out how to store metadata in topics 
-  (topic_id/topic_name/filter_string/date_of_creation)
-* make an Atom to hold the kstream instances: 
-  * On load, go through all filters and create kstream instances
-
-
-
+  
 ## Usage
 
 ### Run the application locally
@@ -23,12 +37,7 @@ git clone <clone here>
 cd <path here>
 tmuxinator . 
 
-# run kafka
-
-cd vendor/kafka;
-bin/zookeeper-server-start.sh config/zookeeper.properties; 
-bin/kafka-server-start.sh config/server.properties;
-```
+### Run API
 
 `lein ring server`
 
