@@ -45,28 +45,24 @@
 (comment
   
   (map :value (list-records (make-topic-config "input") ))
-  (map :value (list-records (make-topic-config "python")))
-  (map :value (list-records (make-topic-config "java")))
+  (map :value (list-records (make-topic-config "input_python")))
+  (map :value (list-records (make-topic-config "input_java")))
+  
+  (map :value (list-records (make-topic-config "input_cap")))
+  (map :value (list-records (make-topic-config "input_dict")))
   
   (delete-topic! (make-topic-config "java"))
   (create-topic! (make-topic-config "input"))
   
-  (publish! (make-topic-config "input")  "java")
+  (publish! (make-topic-config "input")  "python")
   
   (map :value (get-records (make-topic-config "bbb")))
   (defn mapper  [key val]
     (clojure.string/upper-case val))
   
-  (def uppercase
-    (create-map-stream!
-     "input"
-     "uppercase"
-     mapper))
-  
-
-  
   (list-topic-vals (make-topic-config "input"))
   (list-topic-vals (make-topic-config "input"))
+  (list-topic-vals (make-topic-config "java"))
   (list-topic-vals (make-topic-config "uppercase"))
   (publish! (make-topic-config "input") "python33")
   (delete-topic! (make-topic-config "java"))

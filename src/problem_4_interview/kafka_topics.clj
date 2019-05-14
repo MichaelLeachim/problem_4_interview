@@ -47,3 +47,6 @@
   []
   (with-open [client (ja/->AdminClient (kafka-admin-client-config))]
     (ja/list-topics client)))
+(comment
+  (list-topics)
+  )
