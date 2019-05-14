@@ -14,9 +14,11 @@
    [jackdaw.serdes.edn :as jse]
    [jackdaw.serdes.resolver :as resolver]
    [jackdaw.client :as jc]
+   [jackdaw.streams.lambdas :as lambdas]
    [jackdaw.streams :as j]
    [jackdaw.admin :as ja]
-   [problem_4_interview.kafka-conf :refer :all]))
+   [problem_4_interview.kafka-conf :refer :all])
+  (:import [org.apache.kafka.streams.kstream Transformer]))
 
 (defonce ^{:private true} prev-app (atom nil))
 
@@ -70,6 +72,25 @@
       (work-fn val)))
    (j/to (make-topic-config right))))
 
+(defn- map-with-timestamp
+  [from-topics left right work-fn]
+  (let [transformer-supplier-fn
+        #(let [c (atom nil)]
+          (reify Transformer
+            (init [_ context]
+              (reset!  c context)
+              nil)
+             (close [_])
+             (transform [_ k v]
+               (lambdas/key-value (work-fn
+                                   (.timestamp @c)
+                                   k v)))))]
+    (->
+     (j/transform
+      (get from-topics left)
+      transformer-supplier-fn)
+     (j/to (make-topic-config right)))))
+
 (defn- topics-str->kstreams
   ;; (topics-str->kstreams (j/streams-builder) (list "hello" "world"))
   [builder in]
@@ -92,6 +113,8 @@
         (map-values-fn from-topics left right work-fn)
         :filter
         (filter-fn from-topics left right work-fn)
+        :map-with-timestamp
+        (map-with-timestamp from-topics left right work-fn)
         :filter-not
         (filter-not-fn from-topics left right work-fn)
         (throw (Exception. (str "Wrong topology: " predicate " is undefined")))))
@@ -107,11 +130,13 @@
             app)))
 
 (comment
-  
+  (lambdas/key-value [{} {}])
   (run-kstreams
    [:filter "input" "input_python" (fn [k v] (= v "python"))]
    [:filter "input" "input_java" (fn [k v] (= v "java"))]
    [:map-values    "input" "input_cap"  (fn [v] (clojure.string/capitalize v))]
+   [:map-with-timestamp    "input" "input_timestamp"
+    (fn [ts k v]  [k {:ts ts :v v}])]
    [:map-values    "input" "input_dict" (fn [v]  {:hello v})])
   
   (map :value (list-records (make-topic-config "input") ))
@@ -121,6 +146,6 @@
   (map :value (list-records (make-topic-config "input_cap")))
   (map :value (list-records (make-topic-config "input_dict")))
   
-  (publish! (make-topic-config "input")  "python")  
-
+  (publish! (make-topic-config "input")  "python")
+  
   )

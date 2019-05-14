@@ -7,29 +7,53 @@
 
 (ns problem_4_interview.app
   (:require
-   [problem_4_interview.kafka :as kafka-tools]
-   [clojure.core.async :as casync]))
+   [problem_4_interview.kafka :as kafka]
+   [problem_4_interview.kafka-topics :as topics-kafka]
+   [problem_4_interview.tools :as tools]))
 
-;; {:id 1 :name "blab" :q "hello" :timestamp 123131231}
+;; (Topic A, Topic B, Topic C) -> TopicAggregator
+;; TopicAggregator -> (Filter A, Filter B, Filter C)
+;; Filter name: prefix_<from_topic>_query_<timestamp>
+;; 
 
-;; (def app-state
-;;   (atom []))
-
-;; (def input-chan (casync/chan))
-
-;; (let [conf (tools/make-topic-config "input")
-;;       consumer-group-id "input-reader"]
-;;   (casync/go-loop
-;;       [data (tools/list-records conf consumer-group-id)]
-;;     (casync/<! (casync/timeout 200)) ;; poll interval
-;;     (doseq [item data]
-;;       (casync/>! input-chan item))
-;;     (recur (tools/list-records conf consumer-group-id))))
+(defonce topology
+  (atom []))
 
 
-;; (casync/go-loop []
-;;   (println  (casync/<! input-chan))
-;;   (recur))
+(defn make-topic-aggregator
+  []
+  
+  
+  )
+[:map-values "topic-a" "topic-aggregator" {:from "topic-a" :message "blab" :time "123123123"}]
+[:map-values "topic-b" "stamped_topic"]
+[:map-values "topic-k" "stamped_topic"]
+[:map-values "topic-n" "stamped_topic"]
+
+
+
+
+(defn load-topology
+  (for [item (filter (clojure.string/starts-with? % "filter_") (map :topic-name (topics-kafka/list-topics)))]
+    (let [[_ tstamp topic filters-on] (clojure.string/split item "_")]
+      (tools/str->int tstamp)
+      [:filter (str topic "_") item (fn [k v] (clojure.string/))]
+      
+      
+      
+      
+      
+      )
+    
+    
+    
+    
+
+    )
+  )
+
+
+
 
 ;; (defn filter-processing-fn
 ;;   "Will take everything that is within a filter "
@@ -39,22 +63,6 @@
 ;; (defn add-filter!
 ;;   [name topic]
 ;;   )
-
-
-;; (tools/publish! (tools/make-topic-config "input") "blop")
-
-
-
-
-
-
-
-
-
-
-;; tools/list-records
-
-
 
 
 

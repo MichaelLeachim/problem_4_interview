@@ -49,7 +49,7 @@
   (map :value (list-records (make-topic-config "input_java")))
   
   (map :value (list-records (make-topic-config "input_cap")))
-  (map :value (list-records (make-topic-config "input_dict")))
+  (map :value (list-records (make-topic-config "input_timestamp")))
   
   (delete-topic! (make-topic-config "java"))
   (create-topic! (make-topic-config "input"))
