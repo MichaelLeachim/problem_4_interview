@@ -3,26 +3,27 @@
 ;; @ You can find additional information regarding licensing of this work in LICENSE.md @
 ;; @ You must not remove this notice, or any other, from this software.                 @
 ;; @ All rights reserved.                                                               @
-;; @@@@@@ At 2019-05-13 20:54 <thereisnodotcollective@gmail.com> @@@@@@@@@@@@@@@@@@@@@@@@
+;; @@@@@@ At 2019-05-14 14:27 <thereisnodotcollective@gmail.com> @@@@@@@@@@@@@@@@@@@@@@@@
 
-;; https://github.com/FundingCircle/jackdaw/tree/master/examples/dev
+;; Inspired by https://github.com/FundingCircle/jackdaw/tree/master/examples/dev
 
-(ns problem_4_interview.tools
+(ns problem_4_interview.kafka
   (:require
    [clojure.string :as str]
    [clojure.java.io :as io]
-   [clojure.tools.logging :refer [info]]
    [jackdaw.serdes.edn :as jse]
    [jackdaw.serdes.resolver :as resolver]
    [jackdaw.client :as jc]
    [jackdaw.streams :as j]
-   [jackdaw.client.log :as jcl]
    [jackdaw.admin :as ja]))
 
 ;; ===================== Config =========================================
+(defn get-env
+  [param default]
+  (get (System/getenv) param default))
 
 (def bootstrap-servers
-  (get (System/getenv) "BOOTSTRAP_SERVERS" "localhost:9092"))
+  (get-env "BOOTSTRAP_SERVERS" "localhost:9092"))
 
 (defn kafka-producer-config
   []
@@ -40,7 +41,7 @@
    "enable.auto.commit" "true"})
 
 (def application-config
-  {"application.id"            "problem-4-interview"
+  {"application.id"            (get-env "APPLICATION_ID" "problem-4-interview")
    "bootstrap.servers"         bootstrap-servers
    "default.key.serde"         "jackdaw.serdes.EdnSerde"
    "default.value.serde"       "jackdaw.serdes.EdnSerde"
@@ -67,17 +68,7 @@
     :key-serde key-serde
     :value-serde value-serde}))
 
-;; ====================== Misc ============================================
 
-(defn- build-filter-fn
-  [builder from-topic to-topic filter-fn]
-  (let [input-stream  (j/kstream builder from-topic)
-        filter-fn
-        (j/filter input-stream
-                  (fn [[k v]]
-                    (filter-fn k v)))
-        _ (j/to filter-fn to-topic)]
-    builder))
 
 ;; ======================= Mutable actions ===============================
 
@@ -109,14 +100,37 @@
      @(jc/produce! client topic-config key value))
    nil))
 
-(defn create-filter-stream!
-  [from-topic to-topic filter-fn]
+;; ======================= Streams =====================================
+
+(defn- build-filter-map-fn
+  [builder from-topic to-topic predicate filter-map-fn]
+  (let [input-stream  (j/kstream builder from-topic)
+        predicate-fn
+        (predicate input-stream
+                   (fn [[k v]]
+                     (filter-map-fn k v)))
+        _ (j/to predicate-fn to-topic)]
+    builder))
+(defn- create-stream!
+  [from-topic to-topic predicate filter-map-fn]
   (let [builder (j/streams-builder)
         _ (create-topic-if-not-exists! to-topic)
-        _ (build-filter-fn builder from-topic to-topic filter-fn)
+        _ (build-filter-map-fn builder from-topic to-topic predicate filter-map-fn)
         app (j/kafka-streams builder application-config)
         _ (j/start app)]
     app))
+
+(defn create-filter-stream!
+  [from-topic-str to-topic-str filter-fn]
+  (create-stream! (make-topic-config from-topic-str)
+                  (make-topic-config to-topic-str)
+                  j/filter filter-fn))
+
+(defn create-map-stream!
+  [from-topic-str to-topic-str map-fn]
+  (create-stream! (make-topic-config from-topic-str)
+                  (make-topic-config to-topic-str)
+                  j/map map-fn))
 
 ;; ======================= Immutable helpers ==============================
 
@@ -133,43 +147,13 @@
     (ja/list-topics client)))
 
 (defn list-records
-  "Takes a topic config, consumes from a Kafka topic, and returns a
-  seq of maps.
-  mik: 
-
-    making consumer-id random with auto.offset.reset=earliest
-    will make every call to get-records read the topic from the beginning. 
-    On the other hand, there might be problem with stale consumers. 
-
-    See more:
-      https://stackoverflow.com/questions/28561147/how-to-read-data-using-kafka-consumer-api-from-beginning"
-  
   ([topic-config]
-   (list-records topic-config 200))
-  ([topic-config polling-interval-ms]
-   (list-records
-    topic-config polling-interval-ms
-    (str (java.util.UUID/randomUUID))))
-  ([topic-config polling-interval-ms consumer-id]
+   (list-records topic-config (str (java.util.UUID/randomUUID))))
+  ([topic-config consumer-id]
    (let [client-config (kafka-consumer-config consumer-id)]
      (with-open [client (jc/subscribed-consumer client-config
                                                 [topic-config])]
-       (doall (jcl/log client 100 seq))))))
-
-(defn subscribe
-  ([topic-config consume-fn]
-   (subscribe
-    topic-config
-    (str (java.util.UUID/randomUUID))
-    consume-fn))
-  ([topic-config consumer-id consume-fn]
-   (let [client-config (kafka-consumer-config consumer-id)
-         client (jc/subscribed-consumer client-config
-                                        [topic-config])]
-     (repeatedly
-      (fn []
-        (doseq [item (jc/poll client 200)]
-          (consume-fn client (:key item) (:value item))))))))
+       (jc/poll client 200)))))
 
 (defn list-topic-vals
   [topic]
@@ -177,11 +161,9 @@
 
 (comment
   
-  (def x
-    (subscribe
-     (make-topic-config "input")
-     println))
-
+  (map :value (list-records (make-topic-config "input")  "reader"))
+  
+  (map :value (list-records (make-topic-config "java")  "reader"))
   
   (delete-topic! (make-topic-config "java"))
   (create-topic! (make-topic-config "input"))
@@ -189,16 +171,27 @@
   (publish! (make-topic-config "input")  "java")
   
   (map :value (get-records (make-topic-config "bbb")))
-  (def java-filter
+  (defn mapper  [key val]
+    (clojure.string/upper-case val))
+  
+  (def uppercase
+    (create-map-stream!
+     "input"
+     "uppercase"
+     mapper))
+  
+  (def time-filter 
     (create-filter-stream!
      (make-topic-config "input")
      (make-topic-config "java")
      (fn [key val]
-       (clojure.string/includes? (clojure.string/lower-case val) "java"))))
+       (clojure.string/includes? (clojure.string/lower-case val) "java"))))  
+  
   (j/close java-filter)
   
   (list-topic-vals (make-topic-config "java"))
   (list-topic-vals (make-topic-config "input"))
+  (list-topic-vals (make-topic-config "uppercase"))
   (publish! (make-topic-config "input") "java333")
   (delete-topic! (make-topic-config "java"))
   (j/close java-filter)
@@ -207,4 +200,5 @@
   
   
   )
+
 
