@@ -20,7 +20,7 @@
    [problem_4_interview.kafka-conf :refer :all])
   (:import [org.apache.kafka.streams.kstream Transformer]))
 
-(defonce ^{:private true} prev-app (atom nil))
+(def ^{:private true} prev-app (atom nil))
 
 
 (defn- create-topic-if-not-exists!
@@ -41,9 +41,8 @@
 ;; This function will take a topology:
 ;;   [:map    "input" "input_with_date" (fn [k v] ))]
 ;;   [:filter "java" "python" (fn [k v] (clojure.string/c))]
-;; And produce a kstream app: 
+;; Produce and apply a kstream app: 
 ;;   It will stop the previous isntance of a kstream app, if it exists
-
 
 (defn- filter-fn
   [from-topics left right work-fn]
@@ -102,8 +101,8 @@
 ;; Topology builder
 
 (defn- build-topology
-  [topology]
-  (let [builder (j/streams-builder)
+  [streams-builder topology]
+  (let [builder streams-builder
         from-topics (topics-str->kstreams builder (for [[_ in _ _]  topology] in))
         to-topics   (topics-str->kstreams builder (for [[_ _  out _] topology] out))]
     
@@ -120,17 +119,15 @@
         (throw (Exception. (str "Wrong topology: " predicate " is undefined")))))
     
     builder))
-
 (defn run-kstreams
   [& topology]
   (if @prev-app (j/close @prev-app))
   (reset! prev-app
-          (let [app (j/kafka-streams (build-topology topology) application-config)]
+          (let [app (j/kafka-streams (build-topology (j/streams-builder) topology) application-config)]
             (j/start app)
             app)))
 
 (comment
-  (lambdas/key-value [{} {}])
   (run-kstreams
    [:filter "input" "input_python" (fn [k v] (= v "python"))]
    [:filter "input" "input_java" (fn [k v] (= v "java"))]

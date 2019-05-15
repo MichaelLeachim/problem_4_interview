@@ -21,6 +21,9 @@
   [param default]
   (get (System/getenv) param default))
 
+(def app-id
+  (get-env "APPLICATION_ID" "problem_4_interview"))
+
 (def bootstrap-servers
   (get-env "BOOTSTRAP_SERVERS" "localhost:9092"))
 
@@ -42,7 +45,7 @@
    })
 
 (def application-config
-  {"application.id"            (get-env "APPLICATION_ID" "problem-4-interview")
+  {"application.id"            app-id 
    "bootstrap.servers"         bootstrap-servers
    "default.key.serde"         "jackdaw.serdes.EdnSerde"
    "default.value.serde"       "jackdaw.serdes.EdnSerde"

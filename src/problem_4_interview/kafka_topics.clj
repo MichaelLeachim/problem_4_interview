@@ -47,6 +47,15 @@
   []
   (with-open [client (ja/->AdminClient (kafka-admin-client-config))]
     (ja/list-topics client)))
+
+(defn describe-topics
+  "Returns a list of Kafka topics."
+  []
+  (with-open [client (ja/->AdminClient (kafka-admin-client-config))]
+    (ja/describe-cluster client)))
+
+
 (comment
   (list-topics)
+  (describe-topics)
   )
