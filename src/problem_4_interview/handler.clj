@@ -9,32 +9,122 @@
   (:require [compojure.api.sweet :refer :all]
             [ring.util.http-response :refer :all]
             [schema.core :as s]
-            [problem_4_interview.app :as kafka-app]))
+            [jackdaw.client :as jc]
+            [problem_4_interview.kafka :as kafka]
+            [problem_4_interview.kafka-conf :as kafka-conf]
+            [problem_4_interview.tools :as tools]))
 
-(s/defschema Filter
-  {:topic s/Str
-   :q s/Str
-   :timestamp s/Num
-   :id s/Num})
+;; ====================== App state ===================================
 
-(def app
+(def app-state (atom {:last-id 0 :filters {}}))
+
+;; Filter example: 
+;; {:topic "h"
+;;  :q "a"
+;;  :timestamp 1291231239
+;;  :watch-fn (fn [item] (println item))
+;;  :id 1
+;;  :records [] }
+
+;; ===================== App logic ====================================
+(comment
+  (map :value (kafka/list-records (kafka-conf/make-topic-config "input"))))
+
+;; ~TESTED
+(defn create-filter-watcher
+  "Will take a filter from the App state and watch topic for the changes
+   Will terminate, If unable to find a filter on the app state"
+  [app-state filter-id]
+  (let [filter-item (get-in @app-state [:filters filter-id])
+        conf (kafka-conf/make-topic-config (:topic filter-item))
+        consumer-group-id (str (:timestamp filter-item) "." (:topic filter-item))
+        client-config  (kafka-conf/kafka-consumer-config consumer-group-id)]
+    (with-open [client (jc/subscribed-consumer client-config
+                                               [conf])]
+      (loop [data (jc/poll client 200)]
+        (doseq [item data]
+          ((:watch-fn filter-item) item))
+        ;; in case, the filter entry is still there
+        (if (get-in @app-state [:filters filter-id])
+          (recur (jc/poll client 200))
+          ;; otherwise, stop processing
+          nil)))))
+
+
+
+;; TESTED
+(defn match-item-fn
+  [item creation-time q]
+  (and (> (:timestamp item) creation-time)
+       (clojure.string/includes?
+        (clojure.string/lower-case (:value item))
+        (clojure.string/lower-case q))))
+
+(defn watch-fn
+  [app-state item creation-time q last-id]
+  (if (match-item-fn  item creation-time q)
+                   (swap! app-state update-in [:filters last-id :records]
+                          #(concat % [item]))
+                   nil))
+
+;; TESTED
+(defn create-filter-item
+  [app-state last-id topic q]
+  (let [creation-time (System/currentTimeMillis)]
+    {:topic topic
+     :q  q
+     :timestamp creation-time
+     :watch-fn #(watch-fn app-state % creation-time q last-id)
+     :id last-id
+     :records  []}))
+
+;; TESTED
+(defn add-filter-to-the-state
+  [app-state topic q]
+  (let [{last-id :last-id  filters :filters} @app-state]
+    (swap!
+     app-state
+     assoc
+     :last-id (inc last-id)
+     :filters
+     (assoc filters last-id (create-filter-item app-state last-id topic q)))
+    last-id))
+
+(defn make-filter
+  [app-state topic q]
+  (let [filter-id (add-filter-to-the-state  app-state topic q)
+        _ (future (create-filter-watcher app-state filter-id))]
+    filter-id))
+
+(defn delete-filter
+  [app-state filter-id]
+  (swap! app-state tools/dissoc-in [:filters filter-id]))
+
+;; ===================== HTTP Interface ================================
+
+;; TESTED
+(defn make-app
+  [app-state]
   (api
-    (context "/api" []
-      (GET "/filter" []
-        :return {:result Long}
-        :query-params [x :- Long, y :- Long]
-        :summary "Returns a list of filters that are currently working"
-        (ok {:result 12}))
-      
-      (GET "/filter" []
-        :return {:result Long}
-        :query-params [x :- Long, y :- Long]
-        :summary "adds two numbers together"
-        (ok {:result (+ x y)}))
-      
-      ;; (POST "/filter" []
-      ;;   :return Pizza
-      ;;   :body [pizza Pizza]
-      ;;   :summary "echoes a Pizza"
-      ;;   (ok pizza))
-      )))
+   (GET "/filter" []
+        :query-params [{id :- Number -1}]
+        :summary "Returns a list of current filters"
+        (ok
+         (if (not= id -1) 
+           (for [{value :value} (get-in @app-state [:filters id :records])]
+             value)
+           (for [filter (vals (:filters @app-state))]
+             (select-keys filter [:topic :q :timestamp :id])))))
+   (POST "/filter" []
+         :summary "Adds a new filter"
+         :form-params [topic :- String, q :- String]
+         (ok (do (let [id (make-filter app-state topic q)]
+                   (select-keys (get-in @app-state [:filters id] )
+                                [:q :id :timestamp :topic])))))
+   (DELETE "/filter" []
+           :summary "Deletes a filter"
+           :query-params [id :- Number]
+           (ok (do (delete-filter app-state id)
+                   {:result "Successfully deleted"})))))
+
+(def app (make-app app-state))

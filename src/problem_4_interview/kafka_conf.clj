@@ -40,9 +40,7 @@
   {"bootstrap.servers" bootstrap-servers
    "group.id" group-id
    "auto.offset.reset" "earliest"
-   "enable.auto.commit" "false"
-   ;; "true"
-   })
+   "enable.auto.commit" "true"})
 
 (def application-config
   {"application.id"            app-id 
